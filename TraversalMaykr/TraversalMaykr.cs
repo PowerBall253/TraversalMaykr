@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace TraversalMaykr
 {
@@ -25,33 +26,15 @@ namespace TraversalMaykr
 
 			while (true)
 			{
-				Console.Write("Input the start coords: ");
-				StringBuilder stringBuilder = new StringBuilder();
+				double[][] coordsArray = GetCoords();
 
-				while (stringBuilder.ToString().Trim().Split(' ').Length < 3)
+				if (coordsArray == null)
 				{
-					stringBuilder.Append(Console.ReadLine() + " ");
+					continue;
 				}
 
-				double[] startCoords = GetCoords(stringBuilder.ToString());
-
-				Console.Write("Input the end coords: ");
-				StringBuilder stringBuilder2 = new StringBuilder();
-
-				while (stringBuilder2.ToString().Trim().Split(' ').Length < 3)
-				{
-					stringBuilder2.Append(Console.ReadLine() + " ");
-				}
-
-				double[] endCoords = GetCoords(stringBuilder2.ToString());
-
-				startCoords[2] -= 1.6;
-				endCoords[2] -= 1.6;
-
-				for (int i = 0; i < endCoords.Length; i++)
-				{
-					endCoords[i] -= startCoords[i];
-				}
+				double[] coords = coordsArray[0];
+				double[] reverseCoords = coordsArray[1];
 
 				bool? onlySmallDemons = null;
 				Console.WriteLine("Available monsters:\n");
@@ -99,7 +82,7 @@ namespace TraversalMaykr
 					traversalAnim = AvailableAnims[traversalAnimIndex];
 				}
 
-				List<string> traversalInfo = GetTraversalInfo(File.ReadAllText($"traversal{Path.DirectorySeparatorChar}entitydef.txt"), traversalAnim, onlySmallDemons.GetValueOrDefault(), startCoords, endCoords);
+				List<string> traversalInfo = GetTraversalInfo(File.ReadAllText($"traversal{Path.DirectorySeparatorChar}entitydef.txt"), traversalAnim, onlySmallDemons.GetValueOrDefault(), coords, reverseCoords);
 				bool append = !firstTime && File.Exists("Generated Traversals.txt") ? true : false;
 				firstTime = false;
 
@@ -117,36 +100,56 @@ namespace TraversalMaykr
 			}
 		}
 
-		private static List<string> GetTraversalInfo(string traversalInfo, string traversalAnim, bool onlySmallDemons, double[] startCoords, double[] endCoords)
+		private static List<string> GetTraversalInfo(string traversalInfo, string anim, bool onlySmallDemons, double[] coords, double[] reverseCoords)
 		{
-			List<string> list = new List<string>();
+			List<string> traversals = new List<string>();
 			Random random = new Random();
 
 			foreach (string traversalFilePath in Directory.GetFiles("traversal", "*.tin"))
 			{
-				if (!onlySmallDemons || SmallDemons.Contains<string>(Path.GetFileNameWithoutExtension(traversalFilePath)))
+				if (onlySmallDemons && !SmallDemons.Contains<string>(Path.GetFileNameWithoutExtension(traversalFilePath)))
 				{
-					string demonTraversalInfo = traversalInfo;
-					string[] traversalInfoFile = File.ReadAllLines(traversalFilePath);
-					string anim = GetTraversalAnim(traversalAnim, traversalInfoFile.Skip(3).ToArray());
-
-					if (!String.IsNullOrEmpty(anim))
-					{
-						demonTraversalInfo = demonTraversalInfo.Replace("MONSTER_NAME", traversalInfoFile[0]);
-						demonTraversalInfo = demonTraversalInfo.Replace("NUM", $"{random.Next()}");
-						demonTraversalInfo = demonTraversalInfo.Replace("TRAVERSAL_ANIM", traversalInfoFile[2] + anim);
-						demonTraversalInfo = demonTraversalInfo.Replace("MONSTER_TYPE", traversalInfoFile[1]);
-						demonTraversalInfo = demonTraversalInfo.Replace("X1", $"{startCoords[0]}");
-						demonTraversalInfo = demonTraversalInfo.Replace("Y1", $"{startCoords[1]}");
-						demonTraversalInfo = demonTraversalInfo.Replace("Z1", $"{startCoords[2]}");
-						demonTraversalInfo = demonTraversalInfo.Replace("X2", $"{endCoords[0]}");
-						demonTraversalInfo = demonTraversalInfo.Replace("Y2", $"{endCoords[1]}");
-						demonTraversalInfo = demonTraversalInfo.Replace("Z2", $"{endCoords[2]}");
-						list.Add(demonTraversalInfo);
-					}
+					continue;
 				}
+
+				string demonTraversalInfo = traversalInfo;
+				string reverseDemonTraversalInfo = traversalInfo;
+				string[] traversalInfoFile = File.ReadAllLines(traversalFilePath);
+				string traversalAnim = GetTraversalAnim(anim, traversalInfoFile.Skip(3).ToArray());
+
+				if (String.IsNullOrEmpty(traversalAnim))
+				{
+					continue;
+				}
+
+				string reverseTraversalAnim = GetReverseTraversalAnim(traversalAnim);
+
+				demonTraversalInfo = demonTraversalInfo.Replace("MONSTER_NAME", traversalInfoFile[0]);
+				demonTraversalInfo = demonTraversalInfo.Replace("NUM", $"{random.Next()}");
+				demonTraversalInfo = demonTraversalInfo.Replace("TRAVERSAL_ANIM", traversalInfoFile[2] + traversalAnim);
+				demonTraversalInfo = demonTraversalInfo.Replace("MONSTER_TYPE", traversalInfoFile[1]);
+				demonTraversalInfo = demonTraversalInfo.Replace("X1", $"{coords[0]}");
+				demonTraversalInfo = demonTraversalInfo.Replace("Y1", $"{coords[1]}");
+				demonTraversalInfo = demonTraversalInfo.Replace("Z1", $"{coords[2]}");
+				demonTraversalInfo = demonTraversalInfo.Replace("X2", $"{coords[3]}");
+				demonTraversalInfo = demonTraversalInfo.Replace("Y2", $"{coords[4]}");
+				demonTraversalInfo = demonTraversalInfo.Replace("Z2", $"{coords[5]}");
+				traversals.Add(demonTraversalInfo);
+
+				reverseDemonTraversalInfo = reverseDemonTraversalInfo.Replace("MONSTER_NAME", traversalInfoFile[0]);
+				reverseDemonTraversalInfo = reverseDemonTraversalInfo.Replace("NUM", $"{random.Next()}");
+				reverseDemonTraversalInfo = reverseDemonTraversalInfo.Replace("TRAVERSAL_ANIM", traversalInfoFile[2] + reverseTraversalAnim);
+				reverseDemonTraversalInfo = reverseDemonTraversalInfo.Replace("MONSTER_TYPE", traversalInfoFile[1]);
+				reverseDemonTraversalInfo = reverseDemonTraversalInfo.Replace("X1", $"{reverseCoords[0]}");
+				reverseDemonTraversalInfo = reverseDemonTraversalInfo.Replace("Y1", $"{reverseCoords[1]}");
+				reverseDemonTraversalInfo = reverseDemonTraversalInfo.Replace("Z1", $"{reverseCoords[2]}");
+				reverseDemonTraversalInfo = reverseDemonTraversalInfo.Replace("X2", $"{reverseCoords[3]}");
+				reverseDemonTraversalInfo = reverseDemonTraversalInfo.Replace("Y2", $"{reverseCoords[4]}");
+				reverseDemonTraversalInfo = reverseDemonTraversalInfo.Replace("Z2", $"{reverseCoords[5]}");
+				traversals.Add(reverseDemonTraversalInfo);
 			}
-			return list;
+
+			return traversals;
 		}
 
 		private static string GetTraversalAnim(string anim, string[] traversalAnims)
@@ -171,9 +174,25 @@ namespace TraversalMaykr
 			return String.Empty;
 		}
 
-		private static double[] GetCoords(string coordsString)
+		private static string GetReverseTraversalAnim(string traversalAnim)
 		{
-			string[] coordsStringArray = coordsString.Trim().Split(' ');
+			if (traversalAnim.Contains("up"))
+			{
+				return traversalAnim.Replace("up", "down");
+			}
+			else if (traversalAnim.Contains("down"))
+			{
+				return traversalAnim.Replace("down", "up");
+			}
+			else
+			{
+				return traversalAnim;
+			}
+		}
+
+		private static double[] GetDoubleArray(string coordsString)
+		{
+			string[] coordsStringArray = coordsString.Split(' ');
 			double[] coords = new double[3];
 
 			for (int i = 0; i < coords.Length; i++)
@@ -181,11 +200,65 @@ namespace TraversalMaykr
 				if (!Double.TryParse(coordsStringArray[i], out coords[i]))
 				{
 					Console.Error.WriteLine("Failed to parse coord: " + coordsStringArray[i]);
-					Environment.Exit(1);
+					return null;
 				}
 			}
 
 			return coords;
+		}
+
+		private static double[][] GetCoords()
+		{
+			Console.Write("Input the start coords: ");
+			StringBuilder coordsStringBuilder = new StringBuilder();
+
+			while (Regex.Replace(coordsStringBuilder.ToString().Trim(), @"\s+", " ").Split(' ').Length < 3)
+			{
+				coordsStringBuilder.Append(Console.ReadLine() + " ");
+			}
+
+			double[] startCoords = GetDoubleArray(Regex.Replace(coordsStringBuilder.ToString().Trim(), @"\s+", " "));
+			coordsStringBuilder.Clear();
+
+			if (startCoords == null)
+			{
+				return null;
+			}
+
+			Console.Write("Input the end coords: ");
+
+			while (Regex.Replace(coordsStringBuilder.ToString().Trim(), @"\s+", " ").Split(' ').Length < 3)
+			{
+				coordsStringBuilder.Append(Console.ReadLine() + " ");
+			}
+
+			double[] endCoords = GetDoubleArray(Regex.Replace(coordsStringBuilder.ToString().Trim(), @"\s+", " "));
+			coordsStringBuilder.Clear();
+
+			if (endCoords == null)
+			{
+				return null;
+			}
+
+			startCoords[2] -= 1.6;
+			endCoords[2] -= 1.6;
+
+			double[] coords = startCoords.Concat(endCoords).ToArray();
+
+			for (int i = 0; i < endCoords.Length; i++)
+			{
+				coords[startCoords.Length + i] -= coords[i];
+			}
+
+			double[] reverseCoords = endCoords.Concat(coords.Skip(3)).ToArray();
+
+			for (int i = 0; i < endCoords.Length; i++)
+			{
+				reverseCoords[startCoords.Length + i] = -reverseCoords[startCoords.Length + i];
+			}
+
+			double[][] coordsArray = {coords, reverseCoords};
+			return coordsArray;
 		}
 	}
 }
